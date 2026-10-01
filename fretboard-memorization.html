@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fretboard Note Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --wood-0: #1c130d;
+    --wood-1: #2c1e14;
+    --wood-2: #3c2a1c;
+    --string: #e8d9bd;
+    --string-dim: #b7a488;
+    --brass: #c98a3e;
+    --brass-bright: #e3a75a;
+    --inlay: #8fa06a;
+    --danger: #c2604a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --wood-0: #f3ecdf;
+      --wood-1: #ffffff;
+      --wood-2: #e9ddc4;
+      --string: #2c1e14;
+      --string-dim: #5a4a38;
+      --brass: #a5652a;
+      --brass-bright: #8a5522;
+      --inlay: #5f7a3f;
+      --danger: #a33c26;
+    }
+  }
+  :root[data-theme="light"] {
+    --wood-0: #f3ecdf;
+    --wood-1: #ffffff;
+    --wood-2: #e9ddc4;
+    --string: #2c1e14;
+    --string-dim: #5a4a38;
+    --brass: #a5652a;
+    --brass-bright: #8a5522;
+    --inlay: #5f7a3f;
+    --danger: #a33c26;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--wood-0);
+    color: var(--string);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overscroll-behavior-y: contain;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--wood-2) 55%, transparent), transparent 60%);
+    display: flex;
+    justify-content: center;
+  }
+  .page {
+    width: 100%;
+    max-width: 560px;
+    padding: 20px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 100%;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+  header h1 span { color: var(--brass-bright); }
+  .reset-link {
+    background: none;
+    border: none;
+    color: var(--string-dim);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 10px 4px;
+    touch-action: manipulation;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--string-dim) 50%, transparent);
+  }
+  .reset-link:hover { color: var(--string); }
+
+  .control-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .ctrl-btn {
+    min-height: 46px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--string-dim) 30%, transparent);
+    background: var(--wood-1);
+    color: var(--string);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .ctrl-btn.start {
+    background: var(--brass);
+    color: var(--wood-0);
+    border-color: transparent;
+  }
+  .ctrl-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  /* Fretboard stage */
+  .stage {
+    position: relative;
+    border-radius: 18px;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0, transparent calc(16.6% - 1px),
+        color-mix(in srgb, var(--string-dim) 35%, transparent) calc(16.6% - 1px), color-mix(in srgb, var(--string-dim) 35%, transparent) 16.6%
+      ),
+      linear-gradient(180deg, var(--wood-2), var(--wood-1));
+    border: 1px solid color-mix(in srgb, var(--string-dim) 30%, transparent);
+    padding: 32px 14px 26px;
+  }
+  .strings {
+    position: absolute;
+    inset: 1px;
+    border-radius: 17px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    padding: 18px 0;
+    pointer-events: none;
+    opacity: 0.55;
+    overflow: hidden;
+  }
+  .strings div {
+    height: 1px;
+    background: var(--string-dim);
+    opacity: 0.4;
+  }
+  .strings div:nth-child(1) { height: 2px; }
+  .strings div:nth-child(6) { height: 0.5px; opacity: 0.25; }
+
+  .stage-inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-row {
+    font-size: 0.78rem;
+    color: var(--string-dim);
+    letter-spacing: 0.02em;
+    min-height: 1.1em;
+  }
+  .note-display {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(3.4rem, 20vw, 5.8rem);
+    line-height: 1.2;
+    color: var(--string);
+    margin: 10px 0 4px;
+    padding: 0 4px;
+    text-shadow: 0 2px 0 color-mix(in srgb, var(--wood-0) 40%, transparent);
+    transition: none;
+    user-select: none;
+    -webkit-user-select: none;
+    white-space: nowrap;
+  }
+  .live-timer {
+    font-variant-numeric: tabular-nums;
+    font-size: 1rem;
+    color: var(--brass-bright);
+    font-weight: 600;
+  }
+
+  .next-btn {
+    margin-top: 16px;
+    display: block;
+    width: 240px;
+    max-width: 90%;
+    background: var(--brass);
+    color: var(--wood-0);
+    border: none;
+    border-radius: 999px;
+    padding: 18px 24px;
+    min-height: 58px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 6px 0 #8a5b28, 0 10px 18px rgba(0,0,0,0.25);
+    box-shadow: 0 6px 0 color-mix(in srgb, var(--brass) 55%, black), 0 10px 18px rgba(0,0,0,0.25);
+    transition: transform 0.05s ease, box-shadow 0.05s ease;
+  }
+  .next-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--brass) 55%, black), 0 4px 10px rgba(0,0,0,0.2);
+  }
+  .next-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--string-dim);
+    margin-top: 6px;
+  }
+
+
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--wood-1);
+    border: 1px solid color-mix(in srgb, var(--string-dim) 22%, transparent);
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .stat-card .label {
+    font-size: 0.64rem;
+    color: var(--string-dim);
+    letter-spacing: 0.01em;
+  }
+  .stat-card .value {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin-top: 2px;
+    color: var(--brass-bright);
+  }
+  .stat-card .value.small { font-size: 1.05rem; color: var(--string); }
+
+  /* Chart */
+  .chart-card {
+    background: var(--wood-1);
+    border: 1px solid color-mix(in srgb, var(--string-dim) 22%, transparent);
+    border-radius: 14px;
+    padding: 12px 10px 6px;
+  }
+  .chart-card .chart-title {
+    font-size: 0.76rem;
+    color: var(--string-dim);
+    margin: 0 4px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    justify-content: space-between;
+  }
+  .chart-wrap { position: relative; height: 170px; }
+  .empty-note {
+    text-align: center;
+    color: var(--string-dim);
+    font-size: 0.78rem;
+    padding: 26px 10px 8px;
+  }
+
+  @media (max-width: 380px) {
+    .page { padding-left: 12px; padding-right: 12px; gap: 14px; }
+    .stage { padding: 26px 8px 20px; }
+    header h1 { font-size: 1.02rem; }
+    .stat-card .label { font-size: 0.6rem; }
+    .stat-card .value { font-size: 1.15rem; }
+    .chart-wrap { height: 150px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Fretboard <span>Note Trainer</span></h1>
+  </header>
+
+  <div class="control-row">
+    <button class="ctrl-btn start" id="startBtn" type="button">Start</button>
+    <button class="ctrl-btn stop" id="stopBtn" type="button" disabled>Stop</button>
+    <button class="ctrl-btn reset" id="resetBtn" type="button">Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="strings">
+      <div></div><div></div><div></div><div></div><div></div><div></div>
+    </div>
+    <div class="stage-inner">
+      <div class="status-row" id="statusRow">press Start to begin</div>
+      <div class="note-display" id="noteDisplay">–</div>
+      <div class="live-timer" id="liveTimer">0.0s</div>
+      <button class="next-btn" id="nextBtn" type="button" disabled>Next</button>
+      <div class="hint">tap Next, or press Space, the instant you play the note</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">last note</div>
+      <div class="value small" id="lastTime">–</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">12-note pace</div>
+      <div class="value" id="rollingSum">–</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">notes played</div>
+      <div class="value small" id="countVal">0</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">
+      <span>12-note rolling pace (seconds)</span>
+      <span id="chartAvgLabel"></span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="paceChart"></canvas>
+    </div>
+    <div class="empty-note" id="emptyNote">your rolling pace will plot here as you go</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const WINDOW = 12;
+
+  const noteDisplay = document.getElementById('noteDisplay');
+  const statusRow = document.getElementById('statusRow');
+  const liveTimer = document.getElementById('liveTimer');
+  const nextBtn = document.getElementById('nextBtn');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const lastTimeEl = document.getElementById('lastTime');
+  const rollingSumEl = document.getElementById('rollingSum');
+  const countValEl = document.getElementById('countVal');
+  const chartAvgLabel = document.getElementById('chartAvgLabel');
+  const emptyNote = document.getElementById('emptyNote');
+  const canvas = document.getElementById('paceChart');
+
+  let times = [];        // every recorded interval, in seconds
+  let currentNote = null;
+  let startTs = null;
+  let liveInterval = null;
+  let chart = null;
+  let sessionState = 'idle'; // 'idle' | 'running' | 'paused'
+  let pausedAt = null;
+
+  function pickNote(prev) {
+    let n;
+    do { n = NOTES[Math.floor(Math.random() * NOTES.length)]; } while (n === prev && NOTES.length > 1);
+    return n;
+  }
+
+  function fmt(s) { return s.toFixed(1) + 's'; }
+
+  function rollingPace() {
+    // Normalized to a 12-note-equivalent pace, even with a partial window,
+    // so the value is comparable from the very first note instead of
+    // artificially low until 12 notes have been played.
+    const slice = times.slice(-WINDOW);
+    if (slice.length === 0) return 0;
+    const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+    return avg * WINDOW;
+  }
+
+  function startRound(prevNote) {
+    currentNote = pickNote(prevNote);
+    noteDisplay.textContent = currentNote;
+    startTs = performance.now();
+    statusRow.textContent = times.length === 0
+      ? 'find this note, then press Next'
+      : 'now find:';
+    speakNote(currentNote);
+    tickLive();
+    if (liveInterval) clearInterval(liveInterval);
+    liveInterval = setInterval(tickLive, 100);
+  }
+
+  function speakNote(note) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const spoken = note.toLowerCase().replace('#', ' sharp');
+    const utter = new SpeechSynthesisUtterance(spoken);
+    utter.rate = 1;
+    utter.pitch = 1;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function tickLive() {
+    const elapsed = (performance.now() - startTs) / 1000;
+    liveTimer.textContent = fmt(elapsed);
+  }
+
+  function ensureChart() {
+    if (chart) return chart;
+    chart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          borderColor: getComputedStyle(document.documentElement).getPropertyValue('--brass-bright').trim() || '#e3a75a',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          pointRadius: 2.5,
+          pointBackgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--brass-bright').trim() || '#e3a75a',
+          tension: 0.25,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--string-dim').trim(), maxTicksLimit: 6 },
+            grid: { color: 'rgba(128,128,128,0.12)' },
+            title: { display: true, text: 'note #', color: getComputedStyle(document.documentElement).getPropertyValue('--string-dim').trim(), font: { size: 10 } }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--string-dim').trim() },
+            grid: { color: 'rgba(128,128,128,0.12)' },
+          }
+        }
+      }
+    });
+    return chart;
+  }
+
+  function updateChart() {
+    if (times.length === 0) return;
+    emptyNote.style.display = 'none';
+    const c = ensureChart();
+    const pace = [];
+    for (let i = 0; i < times.length; i++) {
+      const windowSlice = times.slice(Math.max(0, i - WINDOW + 1), i + 1);
+      const avg = windowSlice.reduce((a, b) => a + b, 0) / windowSlice.length;
+      pace.push(avg * WINDOW);
+    }
+    c.data.labels = times.map((_, i) => i + 1);
+    c.data.datasets[0].data = pace;
+    c.update();
+  }
+
+  function recordAndAdvance() {
+    if (sessionState !== 'running') {
+      beginOrResume();
+      return;
+    }
+    if (startTs === null) return;
+    const elapsed = (performance.now() - startTs) / 1000;
+    const prevNote = currentNote;
+    times.push(elapsed);
+
+    // Swap to the next note immediately — stats/chart update after, so the
+    // note change itself feels instant rather than waiting on chart work.
+    startRound(prevNote);
+
+    lastTimeEl.textContent = fmt(elapsed);
+    const pace = rollingPace();
+    rollingSumEl.textContent = fmt(pace);
+    countValEl.textContent = String(times.length);
+    const windowLen = Math.min(times.length, WINDOW);
+    chartAvgLabel.textContent = 'avg ' + fmt(pace / WINDOW) + '/note (n=' + windowLen + ')';
+    updateChart();
+  }
+
+  function clearStats() {
+    times = [];
+    lastTimeEl.textContent = '–';
+    rollingSumEl.textContent = '–';
+    countValEl.textContent = '0';
+    chartAvgLabel.textContent = '';
+    emptyNote.style.display = 'block';
+    if (chart) {
+      chart.data.labels = [];
+      chart.data.datasets[0].data = [];
+      chart.update();
+    }
+  }
+
+  function updateControlUI() {
+    startBtn.disabled = sessionState === 'running';
+    stopBtn.disabled = sessionState !== 'running';
+    nextBtn.disabled = sessionState !== 'running';
+  }
+
+  function goIdle() {
+    sessionState = 'idle';
+    pausedAt = null;
+    if (liveInterval) clearInterval(liveInterval);
+    startTs = null;
+    currentNote = null;
+    noteDisplay.textContent = '–';
+    statusRow.textContent = 'press Start to begin';
+    liveTimer.textContent = '0.0s';
+    updateControlUI();
+  }
+
+  function beginOrResume() {
+    if (sessionState === 'idle') {
+      sessionState = 'running';
+      updateControlUI();
+      startRound(null);
+    } else if (sessionState === 'paused') {
+      startTs += performance.now() - pausedAt; // shift so paused time doesn't count
+      pausedAt = null;
+      sessionState = 'running';
+      updateControlUI();
+      statusRow.textContent = times.length === 0 ? 'find this note, then press Next' : 'now find:';
+      tickLive();
+      liveInterval = setInterval(tickLive, 100);
+    }
+  }
+
+  startBtn.addEventListener('click', beginOrResume);
+
+  stopBtn.addEventListener('click', () => {
+    if (sessionState !== 'running') return;
+    sessionState = 'paused';
+    pausedAt = performance.now();
+    if (liveInterval) clearInterval(liveInterval);
+    statusRow.textContent = 'paused';
+    updateControlUI();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    clearStats();
+    goIdle();
+  });
+
+  nextBtn.addEventListener('click', recordAndAdvance);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      recordAndAdvance();
+    }
+  });
+
+  goIdle();
+})();
+</script>
+</body>
+</html>
